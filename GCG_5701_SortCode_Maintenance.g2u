@@ -1,0 +1,354 @@
+Program.Sub.ScreenSU.Start
+Gui.FormSortMaint..Create
+Gui.FormSortMaint..Caption("Sort Code Alpha Numberic Maintence")
+Gui.FormSortMaint..Size(12450,10635)
+Gui.FormSortMaint..MinX(0)
+Gui.FormSortMaint..MinY(0)
+Gui.FormSortMaint..Position(0,0)
+Gui.FormSortMaint..BackColor(-2147483633)
+Gui.FormSortMaint..MousePointer(0)
+Gui.FormSortMaint..Event(UnLoad,FormSortMaint_UnLoad)
+Gui.FormSortMaint.GsGridControlSortCode.Create(GsGridControl)
+Gui.FormSortMaint.GsGridControlSortCode.Size(12030,8835)
+Gui.FormSortMaint.GsGridControlSortCode.Position(105,690)
+Gui.FormSortMaint.GsGridControlSortCode.Event(CellValueChanged,GsGridControlSort_CellValueChanged)
+Gui.FormSortMaint.cmdSave.Create(Button)
+Gui.FormSortMaint.cmdSave.Size(855,375)
+Gui.FormSortMaint.cmdSave.Position(105,9735)
+Gui.FormSortMaint.cmdSave.Caption("Save")
+Gui.FormSortMaint.cmdSave.Event(Click,cmdSave_Click)
+Gui.FormSortMaint.lblYear.Create(Label,"Year",True,1935,255,0,105,120,True,0,"Arial",8,-2147483633,0)
+Gui.FormSortMaint.txtYear.Create(TextBox,"",True,1215,300,0,105,345,True,0,"Arial",8,-2147483643,1)
+Gui.FormSortMaint.txtYear.Event(LostFocus,txtYear_LostFocus)
+Gui.FormSortMaint.txtYear.Event(KeyPressEnter,txtYear_KeyPressEnter)
+Gui.FormSortMaint.cmdSubmit.Create(Button)
+Gui.FormSortMaint.cmdSubmit.Size(855,375)
+Gui.FormSortMaint.cmdSubmit.Position(11250,315)
+Gui.FormSortMaint.cmdSubmit.Caption("Submit")
+Gui.FormSortMaint.cmdSubmit.Event(Click,cmdSubmit_Click)
+Gui.FormSortMaint.lblCopyToYear.Create(Label,"Copy To Year",True,1935,255,0,9960,120,True,0,"Arial",8,-2147483633,0)
+Gui.FormSortMaint.txtToYear.Create(TextBox,"",True,1215,300,0,10005,345,True,0,"Arial",8,-2147483643,1)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+V.Global.sCellValue.Declare(String,"")
+V.Global.sSerial.Declare(String,"")
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sYear.Declare(String,"")
+	V.Local.sNextYear.Declare(String,"")
+	
+	F.Intrinsic.Date.DateAdd("YYYY",1,V.Ambient.Date,V.Local.sNextYear)
+	F.Intrinsic.String.Format(V.Local.sNextYear,"YYYY",V.Local.sNextYear)
+	F.Intrinsic.String.Format(V.Ambient.Date,"YYYY",V.Local.sYear)
+	F.Intrinsic.Control.BlockEvents
+	Gui.FormSortMaint.txtYear.Text(V.Local.sYear)
+	Gui.FormSortMaint.txtToYear.Text(V.Local.sNextYear)
+	F.Intrinsic.Control.UnBlockEvents
+	'coded by rlk
+	'this is the maintenance program to allow users to set the 4 char alpha PL Code.
+	
+	'setting anchors on the screen
+	F.Intrinsic.Control.CallSub(Set_Anchors)
+	'popoulating data 
+	F.Intrinsic.Control.CallSub(Get_Data)
+	'setting properties
+	F.Intrinsic.Control.CallSub(Set_Properties)
+	
+	Gui.FormSortMaint..Show
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.FormSortMaint_UnLoad.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+
+	'checking if connection is stil open
+	F.Intrinsic.Control.If(V.ODBC.Connection!Con.State,=,1)
+		'closing connection
+		F.ODBC.Connection!Con.Close
+	F.Intrinsic.Control.EndIf
+	'ending program
+	F.Intrinsic.Control.End
+
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.FormSortMaint_UnLoad.End
+
+Program.Sub.Get_Data.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sSql.Declare(String,"")
+	'opening company connection
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	'query to get data
+	F.Intrinsic.String.Build("Select a.Sort_Code, Descr, Sort_Year, Prefix, Min_Seq, Max_Seq, Last_Chg_By, Last_Sort_Serial From V_Inv_Sort a Left Join GCG_5701_Sort_Maint b on a.Sort_Code = b.Sort_Code and Sort_Year = '{0}' Order by a.Sort_Code",V.Screen.FormSortMaint!txtYear.Text,V.Local.sSql)
+	'creating Sort datatable
+	F.Data.DataTable.CreateFromSQL("Sort","Con",V.Local.sSql,True)
+	'closing connection
+	F.ODBC.Connection!Con.Close
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Get_Data.End
+
+Program.Sub.Set_Properties.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	'attaching datatable to grid
+	gui.FormSortMaint.GsGridControlSortCode.AddGridviewFromDatatable("GSort","Sort")
+	'setting properties
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","allowedit",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","readonly",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","Caption","Sort Code")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","MinWidth","50")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","Width","50")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","allowedit",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","readonly",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","Caption","Year")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","MinWidth","60")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","Width","60")
+	Gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","Visible",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","allowedit",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","readonly",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","MinWidth","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","Width","110")
+	
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","allowedit",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","readonly",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","Caption","Sort Code Description")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","MinWidth","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","Width","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","allowedit",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","readonly",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","Caption","Min Seq")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","MinWidth","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","Width","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","allowedit",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","readonly",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","Caption","Max Seq")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","MinWidth","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","Width","110")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","allowedit",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","readonly",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","Visible",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","Caption","Last Changed By")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","MinWidth","60")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","Width","60")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","allowedit",False)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","readonly",True)
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","Caption","Last Sort Serial")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","MinWidth","70")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","Width","70")
+	
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Code","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Sort_Year","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Descr","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Max_Seq","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Min_Seq","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Chg_By","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Prefix","HeaderForeColor","White")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","HeaderBackColor","Green")
+	gui.FormSortMaint.GsGridControlSortCode.SetColumnProperty("GSort","Last_Sort_Serial","HeaderForeColor","White")
+			
+	'setting gridview to grid
+	gui.FormSortMaint.GsGridControlSortCode.MainView("GSort")
+	
+	Gui.FormSortMaint.cmdSave.Enabled(False)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Set_Properties.End
+
+Program.Sub.cmdSave_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	'opening company connection
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	'saving records
+	F.Data.DataTable.SaveToDB("Sort","con","GCG_5701_Sort_Maint","Sort_Code*!*Sort_Year",256,"Sort_Code@!@Sort_Code*!*Sort_Year@!@Sort_Year*!*Prefix@!@Prefix*!*Min_Seq@!@Min_Seq*!*Max_Seq@!@Max_Seq*!*Last_Chg_By@!@Last_Chg_By*!*Last_Sort_Serial@!@Last_Sort_Serial")
+	'closing connection
+	F.ODBC.Connection!Con.Close
+	
+	Gui.FormSortMaint.cmdSave.Enabled(False)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.cmdSave_Click.End
+
+Program.Sub.GsGridControlSort_CellValueChanged.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sCol.Declare(String,"")
+	V.Local.sSeq.Declare(String,"")
+
+	Gui.FormSortMaint.cmdSave.Enabled(True)
+
+	F.Data.DataTable.SetValue("Sort",-1,"Sort_Year",V.Screen.FormSortMaint!txtYear.Text)
+
+	F.Intrinsic.Control.If(V.Args.Column.UCase,=,"PREFIX")
+		F.Data.DataTable.SetValue("Sort",V.Args.RowIndex,"Last_Chg_By",V.Caller.User,"Last_Sort_Serial","")
+	F.Intrinsic.Control.Else
+		F.Intrinsic.String.LPad(V.Args.Value,"0",6,V.Local.sSeq)
+		F.Data.DataTable.SetValue("Sort",V.Args.RowIndex,"Last_Chg_By",V.Caller.User,V.Args.Column,V.Local.sSeq)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.GsGridControlSort_CellValueChanged.End
+
+Program.Sub.Set_Anchors.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	
+	Gui.FormSortMaint.cmdSave.Anchor(6)
+	gui.FormSortMaint.GsGridControlSortCode.Anchor(15)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Set_Anchors.End
+
+Program.Sub.txtYear_LostFocus.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sSql.Declare(String,"")
+	
+	F.Intrinsic.Control.If(V.Screen.FormSortMaint!txtYear.Text,<>,"")
+		F.Intrinsic.Control.If(V.Screen.FormSortMaint!txtYear.Text,<>,V.DataTable.Sort(V.DataTable.Sort.RowCount--).Sort_Year!FieldValTrim)
+			'opening company connection
+			
+			F.ODBC.Connection!Con.OpenCompanyConnection
+			'query to get data
+			F.Intrinsic.String.Build("Select a.Sort_Code, Descr, Sort_Year, Prefix, Min_Seq, Max_Seq, Last_Chg_By, Last_Sort_Serial From V_Inv_Sort a Left Join GCG_5701_Sort_Maint b on a.Sort_Code = b.Sort_Code and Sort_Year = '{0}' Order by a.Sort_Code",V.Screen.FormSortMaint!txtYear.Text,V.Local.sSql)
+			'creating Sort datatable
+			F.Data.DataTable.CreateFromSQL("Temp","Con",V.Local.sSql,True)
+			'closing connection
+			F.ODBC.Connection!Con.Close
+			F.Data.DataTable.DeleteRow("Sort")
+			F.Data.DataTable.AcceptChanges("Sort")
+			F.Data.DataTable.Merge("Temp","Sort",False,4)
+			F.Data.DataTable.Close("Temp")
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Else
+		F.Data.DataTable.DeleteRow("Sort")
+		F.Data.DataTable.AcceptChanges("Sort")
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.txtYear_LostFocus.End
+
+Program.Sub.txtYear_KeyPressEnter.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+
+	F.Intrinsic.Control.CallSub(txtYear_LostFocus)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.txtYear_KeyPressEnter.End
+
+Program.Sub.cmdSubmit_Click.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.sSql.Declare(String,"")
+	
+	F.Intrinsic.String.Build("Select a.Sort_Code, Descr, Sort_Year, Prefix, Min_Seq, Max_Seq, Last_Chg_By, Last_Sort_Serial From V_Inv_Sort a Left Join GCG_5701_Sort_Maint b on a.Sort_Code = b.Sort_Code and Sort_Year = '{0}' Order by a.Sort_Code",V.Screen.FormSortMaint!txtYear.Text,V.Local.sSql)
+	F.ODBC.Connection!con.OpenCompanyConnection
+	'creating Sort datatable
+	F.Data.DataTable.CreateFromSQL("SortSave","Con",V.Local.sSql,True)
+	
+	F.Data.DataTable.SetValue("SortSave",-1,"Sort_Year",V.Screen.FormSortMaint!txtToYear.Text)
+	
+	F.Data.DataTable.SaveToDB("SortSave","con","GCG_5701_Sort_Maint","Sort_Code*!*Sort_Year",256,"Sort_Code@!@Sort_Code*!*Sort_Year@!@Sort_Year*!*Prefix@!@Prefix*!*Min_Seq@!@Min_Seq*!*Max_Seq@!@Max_Seq*!*Last_Chg_By@!@Last_Chg_By")
+	F.Data.DataTable.Close("SortSave")
+	F.Intrinsic.String.Build("Year: {0} Data has been copied to Year: {1}",V.Screen.FormSortMaint!txtYear.Text,V.Screen.FormSortMaint!txtToYear.Text,V.Local.sSql)
+	F.Intrinsic.UI.Msgbox(V.Local.sSql)
+	F.ODBC.Connection!con.Close
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_SortCode_Maintenance.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(FormSortMaint_UnLoad)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.cmdSubmit_Click.End
