@@ -1,0 +1,135 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+
+	f.Intrinsic.Control.If(v.Caller.Hook,=,31825)
+			F.Intrinsic.Control.CallSub(Attach_Serial)
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.CallSub(Exit)
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_Serial.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(Exit)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Exit.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+
+	F.Intrinsic.Control.If(V.ODBC.Connection!Con.State,=,1)
+		F.ODBC.Connection!Con.Close
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.Control.End
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_Serial.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Exit.End
+
+Program.Sub.Attach_Serial.Start
+F.Intrinsic.Control.Try
+	V.Local.sError.Declare(String,"")
+	V.Local.i.Declare(Long,0)
+	V.Local.sSql.Declare(String,"")
+	V.Local.sRet.Declare(String,"")
+	V.Local.sSerial.Declare(String,"")
+	V.Local.sWO.Declare(String,"")
+	V.Local.sSuffix.Declare(String,"")
+	V.Local.sSort.Declare(String,"")
+	V.Local.sYear.Declare(String,"")
+	
+	V.Local.sWO.Set(V.Passed.009000)
+	V.Local.sSuffix.Set(V.Passed.009001)
+	
+	F.ODBC.Connection!Con.OpenCompanyConnection
+	
+	'query to see if the company option to attach manual serial numbers is turned on, if it is not, end the program.
+	F.Intrinsic.String.Build("select F_BOOLEAN from V_OP_HEADER where ID = '{0}'","401137",v.Local.sSql)
+	F.ODBC.Connection!Con.ExecuteAndReturn(v.Local.sSql,v.Local.sRet)
+	F.Intrinsic.Control.If(v.Local.sRet.Trim,=,"0")
+		F.Intrinsic.UI.Msgbox("The company option to allow manual serial numbers is not activated.")
+		F.Intrinsic.Control.CallSub(Exit)
+		
+	F.Intrinsic.Control.Else
+		'Loads name of BDF and ID into memory
+	    Function.Intrinsic.BDF.Load("AUX001","AUX001")
+	    
+	    F.Intrinsic.String.Build("Select Part, Location, Date_Opened From V_Job_Header Where Job = '{0}' and Suffix = '{1}'",V.Local.sWO,V.Local.sSuffix,V.Local.sSql)
+	    F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sSort)
+	    
+	    F.Intrinsic.String.Split(V.Local.sSort,"*!*",V.Local.sSort)
+	    F.Intrinsic.String.Format(V.Local.sSort(2),"YYYY",V.Local.sYear)
+	    
+	    F.Intrinsic.String.Build("Select Code_Sort From Inventory_Mstr Where Part = '{0}' and Location = '{1}'",V.Local.sSort(0).Trim,V.Local.sSort(1).Trim,V.Local.sSql)
+	    F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sSort)
+	    
+	    F.Intrinsic.Control.If(V.Local.sSort.Trim,<>,"")
+			F.Intrinsic.Control.For(V.Local.i,1,V.Passed.000026.Long,1)
+				
+				F.Intrinsic.String.Build("Select Rtrim(Last_Sort_Serial) as Last_Serial, Min_Seq, Max_Seq, rtrim(Prefix) as Prefix From GCG_5701_Sort_Maint Where Sort_Code = '{0}' and Sort_Year = '{1}'",V.Local.sSort,V.Local.sYear,V.Local.sSql)
+				F.ODBC.Connection!Con.ExecuteAndReturn(V.Local.sSql,V.Local.sRet)
+				
+				F.Intrinsic.String.Split(V.Local.sRet,"*!*",V.Local.sRet)
+				V.Local.sRet.RedimPreserve(0,3)
+				F.Intrinsic.Control.If(V.Local.sRet(0),=,"")
+					F.Intrinsic.String.Build("{2}{0}-{1}",V.Local.sYear.Right2,V.Local.sRet(1),V.Local.sRet(3),V.Local.sSerial)
+				F.Intrinsic.Control.Else
+					F.Intrinsic.String.Split(V.Local.sRet(0),"-",V.Local.sSerial)
+					F.Intrinsic.Math.Add(V.Local.sSerial(1).Long,1,V.Local.sSerial(1).Long)
+					F.Intrinsic.Control.If(V.Local.sSerial(1).Long,>,V.Local.sRet(2).Long)
+						F.Intrinsic.String.Build("{0}-{1}",V.Local.sSerial(0),V.Local.sRet(1),V.Local.sSerial)
+					F.Intrinsic.Control.Else
+						F.Intrinsic.String.LPad(V.Local.sSerial(1),"0",6,V.Local.sSerial(1))
+						F.Intrinsic.String.Build("{0}-{1}",V.Local.sSerial(0),V.Local.sSerial(1),V.Local.sSerial)
+					F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.EndIf
+				F.Intrinsic.String.Build("Update GCG_5701_Sort_Maint Set Last_Sort_Serial = '{0}' Where Sort_Code = '{1}' and Sort_Year = '{2}'",V.Local.sSerial.Trim,V.Local.sSort,V.Local.sYear,V.Local.sSql)
+				F.ODBC.Connection!Con.Execute(V.Local.sSql)
+				F.Intrinsic.String.Build("{0}|~|",V.Local.sSerial,V.Local.sRet)
+				Function.Intrinsic.BDF.WriteRow("AUX001",V.Local.sRet)
+			    
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000082,"LOCK","1")
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000022,"LOCK","1")
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000023,"LOCK","1")
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000024,"LOCK","1")
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000025,"LOCK","1") 
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.AUX001,"LOCK","1") 
+				F.Intrinsic.UI.ChangeCallerProperty(v.Passed.000030,"LOCK","1") 
+			    
+				v.Passed.000027.Set(V.Passed.000026)
+			F.Intrinsic.Control.Next(V.Local.i)
+		F.Intrinsic.Control.EndIf
+		
+		Function.Intrinsic.BDF.Save("AUX001","AUX001")
+		
+	F.Intrinsic.Control.EndIf
+	
+	F.ODBC.Connection!Con.Close
+	
+	F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+		F.Intrinsic.String.Build("Project: {0}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}","GCG_5701_Serial.g2u",V.Ambient.NewLine,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Local.sError)
+		F.Intrinsic.UI.Msgbox(V.Local.sError)
+		F.Intrinsic.Control.CallSub(Exit)
+	F.Intrinsic.Control.EndIf
+Function.Intrinsic.Control.EndTry
+Program.Sub.Attach_Serial.End
